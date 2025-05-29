@@ -7,7 +7,8 @@ RUN apt-get update && \
     build-essential \
     inotify-tools \
     libgl1 \
-    libglib2.0-0 && \
+    libglib2.0-0 \
+    curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
