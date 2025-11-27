@@ -6,7 +6,6 @@ from app.services.database import get_collection
 import json
 from bson import ObjectId
 
-# Custom JSON encoder for MongoDB objects
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, ObjectId):
@@ -18,13 +17,10 @@ class JSONEncoder(json.JSONEncoder):
 def detection_to_dict(detection: DetectionResponse) -> dict:
     """Convert DetectionResponse to dictionary for MongoDB"""
     detection_dict = detection.model_dump()
-    # Convert nested Pydantic models to dict
     detection_dict["detection_results"] = detection.detection_results.model_dump()
-    # Convert faces and emotions to list of dicts
     if "faces" in detection_dict["detection_results"]:
         faces = []
         for face in detection_dict["detection_results"]["faces"]:
-            # If face is a dict, use as is; else, convert
             if hasattr(face, "box") and hasattr(face, "emotions"):
                 faces.append({
                     "box": face.box,
@@ -33,19 +29,15 @@ def detection_to_dict(detection: DetectionResponse) -> dict:
             elif isinstance(face, dict):
                 faces.append(face)
         detection_dict["detection_results"]["faces"] = faces
-    # Xóa trường emotions ngoài cùng nếu có
     detection_dict["detection_results"].pop("emotions", None)
     return detection_dict
 
 def dict_to_detection(detection_dict: dict) -> DetectionResponse:
     """Convert dictionary from MongoDB to DetectionResponse"""
-    # MongoDB uses _id, convert to detection_id if needed
     if "_id" in detection_dict and "detection_id" not in detection_dict:
         detection_dict["detection_id"] = str(detection_dict.pop("_id"))
-    # Ensure timestamp is datetime
     if "timestamp" in detection_dict and isinstance(detection_dict["timestamp"], str):
         detection_dict["timestamp"] = datetime.fromisoformat(detection_dict["timestamp"])
-    # Convert faces and emotions back to model
     dr = detection_dict["detection_results"]
     if "faces" in dr:
         from app.domain.models.detection import FaceDetection, EmotionScore
@@ -55,7 +47,6 @@ def dict_to_detection(detection_dict: dict) -> DetectionResponse:
                 emotions=[EmotionScore(**emo) for emo in face["emotions"]]
             ) for face in dr["faces"]
         ]
-    # Xóa trường emotions ngoài cùng nếu có
     dr.pop("emotions", None)
     detection_dict["detection_results"] = dr
     return DetectionResponse(**detection_dict)
@@ -63,8 +54,6 @@ def dict_to_detection(detection_dict: dict) -> DetectionResponse:
 async def save_detection(detection: DetectionResponse) -> str:
     """
     Save a detection to storage.
-    Only save to MongoDB (no local/in-memory storage).
-    Returns the detection_id.
     """
     try:
         repo = DetectionRepository(get_collection("detections"))
@@ -78,8 +67,6 @@ async def save_detection(detection: DetectionResponse) -> str:
 async def get_detection(detection_id: str) -> Optional[DetectionResponse]:
     """
     Get a detection by ID using DetectionRepository.
-    Only check MongoDB (no local/in-memory storage).
-    Returns None if not found.
     """
     try:
         repo = DetectionRepository(get_collection("detections"))
@@ -93,7 +80,6 @@ async def get_detection(detection_id: str) -> Optional[DetectionResponse]:
 async def get_detections_by_user(user_id: str, skip: int = 0, limit: int = 10) -> List[DetectionResponse]:
     """
     Get detections for a specific user using DetectionRepository.
-    Only get from MongoDB (no local/in-memory storage).
     """
     detections = []
     try:
@@ -109,8 +95,6 @@ async def get_detections_by_user(user_id: str, skip: int = 0, limit: int = 10) -
 async def delete_detection(detection_id: str) -> bool:
     """
     Delete a detection by ID using DetectionRepository.
-    Only delete from MongoDB (no local/in-memory storage).
-    Returns True if deleted, False if not found.
     """
     try:
         repo = DetectionRepository(get_collection("detections"))

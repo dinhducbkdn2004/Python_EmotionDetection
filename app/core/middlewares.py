@@ -17,9 +17,7 @@ from app.core.logging import logger
 async def exception_handler(request: Request, exception: Exception) -> JSONResponse:
     """
     Global exception handler for all endpoints.
-    Logs the exception and returns a standardized JSON response.
     """
-    # Default error response
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     error_content: Dict[str, Any] = {
         "success": False,
@@ -27,18 +25,15 @@ async def exception_handler(request: Request, exception: Exception) -> JSONRespo
         "details": {}
     }
     
-    # Extract request information for logging
     path = request.url.path
     method = request.method
     client_host = request.client.host if request.client else "unknown"
     
     if isinstance(exception, AppBaseException):
-        # Handle custom application exceptions
         status_code = exception.status_code
         error_content["message"] = exception.message
         error_content["details"] = exception.details
         
-        # Log with appropriate level based on status code
         if status_code >= 500:
             logger.error(
                 f"Error processing request {method} {path} from {client_host}: "
@@ -64,14 +59,12 @@ async def exception_handler(request: Request, exception: Exception) -> JSONRespo
                 }
             )
     else:
-        # Handle unhandled exceptions
         exception_type = type(exception).__name__
         exception_str = str(exception)
         
         error_content["message"] = f"Unexpected error: {exception_type}"
         error_content["details"]["error"] = exception_str
         
-        # Log the unhandled exception with stacktrace
         logger.error(
             f"Unhandled exception processing request {method} {path} from {client_host}: "
             f"{exception_type}: {exception_str}",
@@ -94,33 +87,26 @@ async def exception_handler(request: Request, exception: Exception) -> JSONRespo
 class ErrorHandlingMiddleware:
     """
     Middleware for global exception handling across the application.
-    This middleware catches any unhandled exceptions and processes them
-    using the exception_handler.
     """
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
-            # We only handle HTTP connections
             await self.app(scope, receive, send)
             return
 
-        # Create a request object
         request = Request(scope, receive=receive)
         
         try:
             await self.app(scope, receive, send)
         except Exception as exc:
-            # Handle the exception
             response = await exception_handler(request, exc)
             await response(scope, receive, send)
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Middleware để giới hạn số lượng request từ một IP (hoặc guest_id) cho các endpoint nhạy cảm.
-    Sử dụng MongoDB để lưu trữ thông tin rate limit, đảm bảo giới hạn được duy trì khi restart service.
-    Chỉ áp dụng cho guest user (không có Authorization header), người dùng đã đăng nhập không bị giới hạn.
+    Middleware to limit the number of requests from an IP (or guest_id) for sensitive endpoints.
     """
     def __init__(self, app: ASGIApp, max_requests: int = 10, window_seconds: int = 60):
         super().__init__(app)
@@ -128,15 +114,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.window_seconds = window_seconds
 
     async def dispatch(self, request: Request, call_next):
-        # Chỉ áp dụng cho endpoint /api/detect 
         if request.url.path == f"{settings.API_PREFIX}/detect":
-            # Kiểm tra header Authorization, nếu có thì là authenticated user, không rate limit
             auth_header = request.headers.get("Authorization")
             if auth_header and auth_header.startswith("Bearer "):
-                # Người dùng đã đăng nhập, không rate limit
                 return await call_next(request)
             
-            # Lấy guest_id từ cookie
             guest_cookie = request.cookies.get("guest_usage_info")
             guest_id = None
             if guest_cookie:
@@ -147,7 +129,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 except Exception:
                     pass
             else:
-                # return forbidden
                 return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
                     content={
@@ -158,7 +139,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             
             key = guest_id
             
-            # Kiểm tra rate limit sử dụng MongoRateLimiter
             rate_limiter = get_rate_limiter()
             is_rate_limited = await rate_limiter.check_rate_limit(
                 key=key,
@@ -166,7 +146,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 window_seconds=self.window_seconds
             )
             
-            # Nếu vượt giới hạn, trả về response 429
             if is_rate_limited:
                 rate_info = await rate_limiter.get_remaining_requests(
                     key=key,
@@ -191,30 +170,24 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     headers={"Retry-After": str(rate_info.reset)}
                 )
                 
-        # Tiếp tục xử lý request nếu không bị rate limit
         response = await call_next(request)
         return response
 
 class CustomCORSMiddleware(BaseHTTPMiddleware):
     """
-    Custom middleware để đảm bảo CORS headers được áp dụng đúng cách,
-    đặc biệt là Access-Control-Allow-Credentials và Access-Control-Allow-Origin.
+    Custom middleware to ensure CORS headers are applied correctly, particularly Access-Control-Allow-Credentials and Access-Control-Allow-Origin.
     """
     def __init__(self, app: ASGIApp):
         super().__init__(app)
-        # Parse CORS origins from settings
         self.allowed_origins = []
         if settings.CORS_ORIGINS:
             self.allowed_origins = settings.CORS_ORIGINS.split(',')
             
     async def dispatch(self, request: Request, call_next):
-        # Lấy origin từ request headers
         origin = request.headers.get("origin")
         
-        # Xử lý request và lấy response
         response = await call_next(request)
         
-        # Nếu origin trong danh sách allowed_origins, thêm header
         if origin and origin in self.allowed_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"

@@ -4,11 +4,11 @@ from datetime import datetime
 
 class RateLimit(BaseModel):
     """
-    Model đại diện cho giới hạn request của một người dùng (hoặc IP).
+    Model representing the rate limit for a user (or IP).
     """
-    key: str  # User ID, guest ID, or IP address
-    timestamps: List[float]  # List of Unix timestamps of recent requests
-    last_updated: float  # Last time this record was updated
+    key: str
+    timestamps: List[float]
+    last_updated: float
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -22,11 +22,11 @@ class RateLimit(BaseModel):
 
 class RateLimitInfo(BaseModel):
     """
-    Model chứa thông tin về giới hạn request hiện tại cho client.
+    Model containing the current rate limit information for the client.
     """
-    remaining: int  # Số request còn lại
-    reset: int  # Thời gian (seconds) khi reset rate limit
-    total: int  # Tổng số request được phép trong window
+    remaining: int
+    reset: int
+    total: int
     
     model_config = ConfigDict(
         json_schema_extra={

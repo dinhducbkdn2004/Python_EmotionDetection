@@ -1,7 +1,3 @@
-"""
-Optimized video emotion detection pipeline for realtime processing.
-This module contains the video processing pipeline optimized for Socket.IO streaming.
-"""
 import time
 import cv2
 import numpy as np
@@ -17,7 +13,6 @@ from app.services.model_loader import EmotionModelCache
 from app.domain.models.detection import DetectionResult, EmotionScore, FaceDetection
 from app.core.metrics import realtime_fps_gauge
 
-# Cấu hình mặc định cho xử lý video frames
 DEFAULT_VIDEO_CONFIG = {
     "detection_interval": 1,
     "min_face_": 64,
@@ -159,7 +154,6 @@ class VideoEmotionDetector:
             face_ids = []
             original_boxes = []
         
-        # Khởi tạo kết quả
         face_detected = len(face_boxes) > 0
         face_detections = []
         
