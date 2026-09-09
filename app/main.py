@@ -130,14 +130,24 @@ app.add_middleware(
 # Add CustomCORSMiddleware to ensure proper CORS headers for all responses
 app.add_middleware(CustomCORSMiddleware)
 
-# Add CORS middleware
+# Configure CORS origins
+origins = []
 if hasattr(settings, 'CORS_ORIGINS') and settings.CORS_ORIGINS:
-    origins = settings.CORS_ORIGINS.split(',')
-    logger.info(f"CORS enabled for specific origins: {origins}")
-else:
-    # Development with explicitly defined origins
-    origins = ["http://localhost:3000", "http://localhost:5173", "https://emd.ducbkdn.space"]
-    logger.info(f"CORS enabled for specific development origins: {origins}")
+    origins = [o.strip() for o in settings.CORS_ORIGINS.split(',') if o.strip()]
+
+default_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://emd.medicalink.online",
+    "https://emdbe.medicalink.online",
+    "https://emd.ducbkdn.space",
+    "https://emdbe.ducbkdn.space",
+]
+for default_origin in default_origins:
+    if default_origin not in origins:
+        origins.append(default_origin)
+
+logger.info(f"CORS enabled for origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,

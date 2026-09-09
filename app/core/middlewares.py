@@ -179,16 +179,41 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
     """
     def __init__(self, app: ASGIApp):
         super().__init__(app)
-        self.allowed_origins = []
-        if settings.CORS_ORIGINS:
-            self.allowed_origins = settings.CORS_ORIGINS.split(',')
+        self.allowed_origins = [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://emd.medicalink.online",
+            "https://emdbe.medicalink.online",
+            "https://emd.ducbkdn.space",
+            "https://emdbe.ducbkdn.space",
+        ]
+        if hasattr(settings, 'CORS_ORIGINS') and settings.CORS_ORIGINS:
+            for o in settings.CORS_ORIGINS.split(','):
+                o_clean = o.strip()
+                if o_clean and o_clean not in self.allowed_origins:
+                    self.allowed_origins.append(o_clean)
             
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin")
         
+        # Handle preflight OPTIONS request if needed
+        if request.method == "OPTIONS":
+            if origin and (origin in self.allowed_origins or "*" in self.allowed_origins):
+                from fastapi.responses import Response
+                return Response(
+                    status_code=204,
+                    headers={
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                        "Access-Control-Allow-Headers": request.headers.get("access-control-request-headers", "*"),
+                        "Access-Control-Max-Age": "86400",
+                    }
+                )
+
         response = await call_next(request)
         
-        if origin and origin in self.allowed_origins:
+        if origin and (origin in self.allowed_origins or "*" in self.allowed_origins):
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             
