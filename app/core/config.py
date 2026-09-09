@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     SSL_CERTFILE: Optional[str] = os.getenv("SSL_CERTFILE", "/app/ssl/cert.pem")
     
     # CORS settings
-    CORS_ORIGINS: Optional[str] = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://emd.ducbkdn.space")
+    CORS_ORIGINS: Optional[str] = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,https://emd.medicalink.online,https://emdbe.medicalink.online,https://emd.ducbkdn.space,https://emdbe.ducbkdn.space")
     
     # MongoDB settings
     MONGODB_URI: str = os.getenv("MONGODB_URI", "")
