@@ -1,14 +1,11 @@
-# app/core/validators.py
-"""
-Các hàm validator chung cho dự án.
-"""
+
 import re
 from typing import Any
 from email_validator import validate_email, EmailNotValidError
 
 
 def is_valid_email(email: str) -> bool:
-    """Kiểm tra định dạng email hợp lệ."""
+    """Check if email is valid."""
     try:
         validate_email(email)
         return True
@@ -17,12 +14,12 @@ def is_valid_email(email: str) -> bool:
 
 
 def is_valid_image_filename(filename: str) -> bool:
-    """Kiểm tra tên file có phải là ảnh hợp lệ không (jpg, jpeg, png, gif)."""
+    """Check if filename is a valid image (jpg, jpeg, png, gif)."""
     return bool(re.match(r"^.+\.(jpg|jpeg|png|gif)$", filename, re.IGNORECASE))
 
 
 def is_positive_number(value: Any) -> bool:
-    """Kiểm tra số dương."""
+    """Check if value is a positive number."""
     try:
         return float(value) > 0
     except (TypeError, ValueError):
@@ -30,5 +27,5 @@ def is_positive_number(value: Any) -> bool:
 
 
 def is_non_empty_string(value: Any) -> bool:
-    """Kiểm tra chuỗi không rỗng."""
+    """Check if value is a non-empty string."""
     return isinstance(value, str) and value.strip() != ""

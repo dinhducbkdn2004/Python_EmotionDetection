@@ -39,14 +39,13 @@ async def detect_emotion(
     detect_emotions=Depends(get_emotion_detection_service)
 ):
     """
-    Upload ảnh để xác định cảm xúc.
-    Guest sẽ bị giới hạn số lần sử dụng.
+    Detect emotion from image uploaded by user.
     """
     
     try:
-        # Tách detection (nhẹ) và upload/lưu DB (nặng) thành 2 bước
+        # Split detection (light) and upload/save DB (heavy) into two steps
         detection_result, bg_args = await detect_emotions(file, current_user, background=True)
-        # Đẩy task upload/lưu DB vào background
+        # Push task upload/save DB into background
         background_tasks.add_task(bg_args["background_func"], *bg_args["args"], **bg_args["kwargs"])
         return detection_result
     except HTTPException as e:
@@ -68,7 +67,7 @@ async def get_detection_history(
     get_detections_by_user=Depends(get_detection_history_service)
 ):
     """
-    Trả về lịch sử sử dụng của người dùng.
+    Get detection history of user.
     """
     if current_user.is_guest:
         raise HTTPException(status_code=401, detail="Authentication required for batch detection.")
@@ -82,7 +81,7 @@ async def get_detection_detail(
     get_detection=Depends(get_single_detection_service)
 ):
     """
-    Lấy chi tiết một detection theo ID.
+    Get detail of a detection by ID.
     """
     if current_user.is_guest:
         raise HTTPException(status_code=401, detail="Authentication required for batch detection.")
@@ -160,7 +159,7 @@ async def detect_emotion_batch(
     """
     if current_user.is_guest:
         raise HTTPException(status_code=401, detail="Authentication required for batch detection.")
-    # 1. Đọc toàn bộ file vào bộ nhớ ngay lập tức
+
     file_contents = []
     for file in files:
         content = await file.read()
@@ -185,7 +184,7 @@ async def detect_emotion_batch(
                     is_BytesIO=True
                 )
                 background_tasks.add_task(bg_args["background_func"], *bg_args["args"], **bg_args["kwargs"])
-                # Sử dụng jsonable_encoder để chuyển đổi kết quả
+
                 yield f"data: {json.dumps(jsonable_encoder(detection_result))}\n\n"
                 await asyncio.sleep(0)
             except Exception as e:

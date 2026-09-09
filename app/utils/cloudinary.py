@@ -5,7 +5,6 @@ import uuid
 from PIL import Image
 import io
 
-# Initialize Cloudinary with credentials
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,
     api_key=settings.CLOUDINARY_API_KEY,
@@ -15,8 +14,6 @@ cloudinary.config(
 def preprocess_image_for_upload(image_data: bytes, max_size: int = 800) -> bytes:
     """
     Resize and compress image before uploading to Cloudinary.
-    - Resize longest edge to max_size px if needed
-    - Convert to JPEG (quality 85)
     """
     try:
         img = Image.open(io.BytesIO(image_data)).convert("RGB")
@@ -34,9 +31,7 @@ def preprocess_image_for_upload(image_data: bytes, max_size: int = 800) -> bytes
 async def upload_image_to_cloudinary(image_data: bytes) -> str:
     """
     Upload an image to Cloudinary and return the URL.
-    Preprocess image before upload.
     """
-    # Preprocess image (resize/compress)
     processed_data = preprocess_image_for_upload(image_data)
     public_id = f"emotion_detection/{uuid.uuid4()}"
     try:

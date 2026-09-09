@@ -7,7 +7,7 @@ from app.core.exceptions import AuthenticationException, ValidationException
 
 def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """
-    Tạo JWT token với payload cung cấp
+    Create JWT token with provided payload
     """
     to_encode = data.copy()
     
@@ -18,22 +18,19 @@ def create_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None
     
     to_encode.update({"exp": expire})
     
-    # Tạo JWT token
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 def verify_token(token: str) -> Dict[str, Any]:
     """
-    Xác thực JWT token và trả về payload
+    Verify JWT token and return payload
     
     Raises:
-        AuthenticationException: Nếu token không hợp lệ hoặc đã hết hạn
+        AuthenticationException: If token is invalid or expired
     """
     try:
-        # Giải mã token
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         
-        # Kiểm tra hết hạn
         if "exp" in payload and datetime.fromtimestamp(payload["exp"]) < datetime.utcnow():
             raise AuthenticationException("Token expired")
         

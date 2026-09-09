@@ -26,36 +26,27 @@ class SocketManager:
     """Manager for Socket.IO connections and event handling."""
     
     def __init__(self):
-        # Tạo ASGI app
         self.app = socketio.ASGIApp(
             socketio_server=sio,
             socketio_path='socket.io'
         )
         
-        # Tạo namespace
         self.namespace = '/emotion-detection'
         
-        # Lưu trữ detector instances cho mỗi kết nối
         self.detectors: Dict[str, VideoEmotionDetector] = {}
         
-        # Lưu trữ số lượng kết nối đồng thời
         self.connection_count = 0
         
-        # Maximum concurrent connections
         self.MAX_CONCURRENT_CONNECTIONS = 20
         
-        # Để theo dõi frame đang được xử lý cho mỗi client
         self.processing_frames: Dict[str, bool] = {}
         
-        # Lưu trữ frame mới nhất cho mỗi client
         self.latest_frames: Dict[str, Dict[str, Any]] = {}
         
-        # Đăng ký các event handlers
         self._register_handlers()
     
     def _register_handlers(self):
         """Register all Socket.IO event handlers."""
-        # Kết nối và xác thực
         @sio.event(namespace=self.namespace)
         async def connect(sid, environ, auth):
             """Handle new connection with authentication."""
@@ -68,7 +59,6 @@ class SocketManager:
                 raise ConnectionRefusedError('Authentication required')
 
             try:
-                # Xác thực JWT token
                 user_data = verify_token(auth['token'])
                 user_id = user_data.get('sub')
                 
@@ -76,7 +66,6 @@ class SocketManager:
                     logger.warning(f"Invalid token for {sid}")
                     raise ConnectionRefusedError('Invalid authentication token')
 
-                # Lưu thông tin session
                 await sio.save_session(sid, {
                     'user_id': user_id,
                     'connected_at': time.time(),
@@ -84,7 +73,6 @@ class SocketManager:
                     'config': {}
                 }, namespace=self.namespace)
                 
-                # Tăng connection count
                 self.connection_count += 1
                 realtime_connections_gauge.set(self.connection_count)
                 
@@ -102,11 +90,9 @@ class SocketManager:
                 session = await sio.get_session(sid, namespace=self.namespace)
                 user_id = session.get('user_id', 'unknown')
                 
-                # Giảm connection count
                 self.connection_count -= 1
                 realtime_connections_gauge.set(self.connection_count)
                 
-                # Xóa detector nếu tồn tại
                 if sid in self.detectors:
                     del self.detectors[sid]
                 
@@ -123,21 +109,18 @@ class SocketManager:
                 client_id = data.get('client_id', sid)
                 config = data.get('config', {})
                 
-                # Cập nhật session
                 session['client_id'] = client_id
                 session['config'] = config
                 await sio.save_session(sid, session, namespace=self.namespace)
                 
-                # Khởi tạo VideoEmotionDetector cho kết nối này
                 self.detectors[sid] = VideoEmotionDetector(config=config)
                 
-                # Gửi phản hồi
                 await sio.emit('initialized', {
                     'session_id': sid,
                     'timestamp': time.time(),
                     'config': {
-                        'max_frame_rate': 10,  # Giới hạn khung hình tối đa
-                        'max_resolution': [640, 480],  # Độ phân giải tối đa
+                        'max_frame_rate': 10,
+                        'max_resolution': [640, 480],
                         'supported_actions': ['start', 'stop', 'configure']
                     }
                 }, room=sid, namespace=self.namespace)
@@ -160,7 +143,6 @@ class SocketManager:
                 action = data.get('action')
                 
                 if action == 'start':
-                    # Bắt đầu xử lý
                     session['is_processing'] = True
                     await sio.save_session(sid, session, namespace=self.namespace)
                     
@@ -171,7 +153,6 @@ class SocketManager:
                     }, room=sid, namespace=self.namespace)
                     
                 elif action == 'stop':
-                    # Dừng xử lý
                     session['is_processing'] = False
                     await sio.save_session(sid, session, namespace=self.namespace)
                     
@@ -182,12 +163,10 @@ class SocketManager:
                     }, room=sid, namespace=self.namespace)
                     
                 elif action == 'configure':
-                    # Cập nhật cấu hình
                     config = data.get('config', {})
                     session['config'].update(config)
                     await sio.save_session(sid, session, namespace=self.namespace)
                     
-                    # Cập nhật cấu hình cho detector
                     if sid in self.detectors:
                         self.detectors[sid].update_config(config)
                     
@@ -245,7 +224,6 @@ class SocketManager:
             try:
                 session = await sio.get_session(sid, namespace=self.namespace)
                 
-                # Kiểm tra trạng thái xử lý
                 if not session.get('is_processing', False):
                     await sio.emit('error_message', {
                         'code': 400,
@@ -254,14 +232,12 @@ class SocketManager:
                     }, room=sid, namespace=self.namespace)
                     return
                 
-                # Kiểm tra dữ liệu frame
                 if not data or 'data' not in data:
                     logger.warning(f"No frame data provided from client {sid}")
                     return
                 
                 frame_id = data.get('frame_id', 'unknown')
                 
-                # Lưu frame mới nhất
                 self.latest_frames[sid] = data
                 
                 if self.processing_frames.get(sid, False):
@@ -271,10 +247,8 @@ class SocketManager:
                 self.processing_frames[sid] = True
                 
                 try:
-                    # Lấy frame mới nhất
                     latest_frame = self.latest_frames[sid]
 
-                    # Xử lý frame với VideoEmotionDetector
                     await self._process_frame(sid, latest_frame)
 
                 finally:
@@ -292,44 +266,38 @@ class SocketManager:
 
     async def emit_to_room(self, room: str, event: str, data: Dict[str, Any]):
         """
-        Gửi sự kiện đến tất cả clients trong một room
+        Emit event to all clients in a room
         """
         await sio.emit(event, data, room=room, namespace=self.namespace)
     
     async def emit_to_all(self, event: str, data: Dict[str, Any]):
         """
-        Gửi sự kiện đến tất cả clients
+        Emit event to all clients
         """
         await sio.emit(event, data, namespace=self.namespace)
     
     async def get_connected_clients(self) -> List[str]:
         """
-        Lấy danh sách các client đang kết nối
+        Get list of connected clients
         """
         return list(self.detectors.keys())
 
     async def _process_frame(self, sid: str, frame_data: Dict[str, Any]):
         """Process video frame using VideoEmotionDetector."""
-        # Nếu detector chưa được khởi tạo, tạo mới với cấu hình mặc định
         if sid not in self.detectors:
             session = await sio.get_session(sid, namespace=self.namespace)
             config = session.get('config', {})
             self.detectors[sid] = VideoEmotionDetector(config=config)
             logger.info(f"Initialized new VideoEmotionDetector for client {sid} with config: {config}")
             
-        # Kiểm tra định dạng video frame
         if not self._validate_frame_data(frame_data, sid):
-            # Đã báo lỗi trong _validate_frame_data, không cần xử lý tiếp
             return None
             
-        # Xử lý frame
         try:
             result = await self.detectors[sid].process_frame(frame_data)
             
-            # Gửi kết quả về client
             await sio.emit('detection_result', result, room=sid, namespace=self.namespace)
             
-            # Định kỳ gửi thông tin hiệu suất (sau mỗi 30 frames)
             if self.detectors[sid].frame_count % 30 == 0:
                 metrics = self.detectors[sid].get_performance_metrics()
                 await sio.emit('status', {
@@ -339,13 +307,11 @@ class SocketManager:
                     'metrics': metrics
                 }, room=sid, namespace=self.namespace)
                 
-                # Kiểm tra hiệu suất và đề xuất điều chỉnh nếu cần
                 if metrics['current_fps'] < 3 and metrics['processed_frames'] > 60:
-                    # Đề xuất giảm độ phân giải hoặc tăng detection_interval
                     suggested_config = {}
                     
                     current_width, current_height = self.detectors[sid].config['processing_resolution']
-                    if current_width > 320:  # Không giảm quá thấp
+                    if current_width > 320:
                         suggested_config['processing_resolution'] = (
                             int(current_width * 0.7),
                             int(current_height * 0.7)
@@ -359,7 +325,6 @@ class SocketManager:
                             'timestamp': time.time()
                         }, room=sid, namespace=self.namespace)
             
-            # Trả về kết quả để có thể sử dụng sau này
             return result
         except Exception as e:
             logger.error(f"Error processing frame for client {sid}: {str(e)}")
@@ -369,38 +334,28 @@ class SocketManager:
             
     def _validate_frame_data(self, frame_data: Dict[str, Any], sid: str) -> bool:
         """Validate incoming frame data format."""
-        if not isinstance(frame_data, dict):
-            logger.error(f"Invalid frame data type from client {sid}: not a dictionary")
-            return False
             
-        # Kiểm tra các trường bắt buộc
         required_fields = ['data', 'frame_id']
         for field in required_fields:
             if field not in frame_data:
                 logger.error(f"Missing required field '{field}' in frame data from client {sid}")
                 return False
                 
-        # Kiểm tra định dạng base64
         base64_data = frame_data.get('data', '')
         if not base64_data:
             logger.error(f"Empty base64 data from client {sid}")
             return False
             
-        # Kiểm tra xem dữ liệu base64 có đúng định dạng không
         try:
-            # Xử lý data URI
             if ',' in base64_data:
-                # Ví dụ: "data:image/jpeg;base64,/9j/4AAQ..."
                 header, base64_data = base64_data.split(',', 1)
                 if not header.startswith('data:image'):
                     logger.warning(f"Unusual data URI header from client {sid}: {header}")
                     
-            # Kiểm tra độ dài tối thiểu (đủ để chứa một hình ảnh cơ bản)
             if len(base64_data) < 100:
                 logger.warning(f"Suspiciously short base64 data from client {sid}: {len(base64_data)} bytes")
                 return False
                 
-            # Thử decode một phần nhỏ để xác minh định dạng
             import base64
             base64.b64decode(base64_data[:20])
             
@@ -409,5 +364,4 @@ class SocketManager:
             logger.error(f"Invalid base64 data from client {sid}: {str(e)}")
             return False
 
-# Khởi tạo một instance để sử dụng trong ứng dụng
 socket_manager = SocketManager() 
