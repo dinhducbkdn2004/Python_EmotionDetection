@@ -29,6 +29,7 @@ jobs:
           USER=$(echo "$USER" | xargs)
 
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ~/.ssh/id_rsa ${USER}@${HOST} << 'EOF'
+            set -e
             cd /home/azureuser/emotion-backend
             git pull origin main
             docker compose -f docker-compose.prod.yml up -d --build
