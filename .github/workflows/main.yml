@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,20 +15,25 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Setup SSH & Deploy to Azure VM
+        env:
+          SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          HOST: ${{ secrets.AZURE_VM_HOST }}
+          USER: ${{ secrets.AZURE_VM_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AZURE_VM_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.AZURE_VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to Azure VM
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.AZURE_VM_USER }}@${{ secrets.AZURE_VM_HOST }} << 'EOF'
+          HOST=$(echo "$HOST" | xargs)
+          USER=$(echo "$USER" | xargs)
+
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 -i ~/.ssh/id_rsa ${USER}@${HOST} << 'EOF'
             cd /home/azureuser/emotion-backend
             git pull origin main
             docker compose -f docker-compose.prod.yml up -d --build
             docker image prune -f
           EOF
+
 
 
