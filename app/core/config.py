@@ -64,12 +64,14 @@ class Settings(BaseSettings):
     
     # Face detection minSize (for detectMultiScale)
     FACE_DETECT_MIN_SIZE: int = int(os.getenv("FACE_DETECT_MIN_SIZE", "64"))  # default 32px
-    
+    ENV: str = os.getenv("ENV", "development")
+
     # class Config:
     #     env_file = ".env"
     model_config = {
         "env_file": ".env",
-        "case_sensitive": True
+        "case_sensitive": True,
+        "extra": "ignore"
     }
 
 settings = Settings()
